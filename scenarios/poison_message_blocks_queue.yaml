@@ -1,0 +1,30 @@
+id: poison_message_blocks_queue
+title: Receipt emails stop; queue depth grows
+difficulty: medium
+description: >
+  A truncated-JSON job reaches the head of the queue. Worker 2.3.0 retries failed jobs forever
+  with a 1s backoff, so the poison job blocks everything behind it. Restarting the worker
+  quarantines jobs that already exceeded max_attempts and the queue drains.
+alert:
+  name: WorkerQueueBacklog
+  severity: page
+  service: worker
+  summary: worker queue depth above 50 and growing
+inject:
+  - {op: poison_job, at: 0}
+ground_truth:
+  root_cause:
+    category: poison_message
+    service: worker
+    summary: malformed job payload retried forever, blocking the queue
+  required_evidence:
+    - {source: log, service: worker, msg_contains: "job failed, will retry"}
+    - {source: log, service: worker, field: attempt, min: 5}
+    - {source: metric, name: queue_depth}
+  correct_actions:
+    - {type: restart_service, service: worker}
+  wrong_actions:
+    - {type: rollback_deploy, service: worker, to_version: "2.2.0"}
+    - {type: rollback_deploy, service: api, to_version: "1.4.0"}
+  success_criteria:
+    - {metric: worker.queue_depth, op: "<", value: 50}

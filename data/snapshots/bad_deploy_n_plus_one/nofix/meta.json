@@ -1,0 +1,7 @@
+{
+  "scenario_id": "bad_deploy_n_plus_one",
+  "branch": "nofix",
+  "start_ts": 1793827872.547,
+  "end_ts": 1793827938.208,
+  "scrape_interval_s": 2.0
+}

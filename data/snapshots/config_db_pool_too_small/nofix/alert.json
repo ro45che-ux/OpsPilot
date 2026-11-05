@@ -1,0 +1,7 @@
+{
+  "name": "ApiHighErrorRate",
+  "severity": "page",
+  "service": "api",
+  "summary": "api 5xx rate above 2%",
+  "fired_at": 1793828045.489
+}

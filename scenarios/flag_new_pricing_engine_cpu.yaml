@@ -1,0 +1,37 @@
+id: flag_new_pricing_engine_cpu
+title: Everything slows down after enabling a feature flag
+difficulty: hard
+description: >
+  Someone enables flags.new_pricing_engine for 100% of traffic. The new engine burns ~60ms of CPU
+  per order. No deploy happened; the only trace is a flag change. CPU saturates the single Python
+  process and latency rises on every route, including ones that never price anything.
+alert:
+  name: ApiHighLatencyP99
+  severity: page
+  service: api
+  summary: api p99 request latency above 400ms
+inject:
+  - op: set_config
+    at: 0
+    id: chg-flag
+    service: api
+    key: flags.new_pricing_engine
+    value: true
+    summary: Enable new_pricing_engine for 100% of traffic
+    author: pm.jordan
+ground_truth:
+  root_cause:
+    category: flag_change
+    service: api
+    change_id: chg-flag
+    summary: new_pricing_engine flag enabled, CPU-bound pricing saturates the process
+  required_evidence:
+    - {source: change, ref: chg-flag}
+    - {source: metric, name: process_cpu_percent}
+  correct_actions:
+    - {type: revert_config, service: api, key: flags.new_pricing_engine, value: false}
+  wrong_actions:
+    - {type: rollback_deploy, service: api, to_version: "1.4.0"}
+    - {type: revert_config, service: api, key: db_pool_size, value: 16}
+  success_criteria:
+    - {metric: api.p99_latency_s, op: "<", value: 0.4}

@@ -1,0 +1,30 @@
+id: downstream_payments_latency
+title: Slow payments provider backs up the whole API
+difficulty: medium
+description: >
+  The payments provider becomes slow (~1s added). The API holds a DB connection while waiting on
+  payments, so the pool saturates and unrelated endpoints slow down too. Nothing was deployed or
+  changed; the correct action is to escalate, not to change our own system.
+alert:
+  name: ApiHighLatencyP99
+  severity: page
+  service: api
+  summary: api p99 request latency above 400ms
+inject:
+  - {op: fault, at: 0, key: payments_latency_ms, value: 1000}
+ground_truth:
+  root_cause:
+    category: downstream_dependency
+    service: payments
+    summary: payments provider latency rose by ~1s
+  required_evidence:
+    - {source: log, service: api, msg_contains: payments provider slow}
+    - {source: metric, name: payments_request_duration_seconds_bucket}
+  correct_actions:
+    - {type: escalate, reason: third-party payments provider degraded}
+  wrong_actions:
+    - {type: rollback_deploy, service: api, to_version: "1.4.0"}
+    - {type: restart_service, service: api}
+    - {type: revert_config, service: api, key: db_pool_size, value: 4}
+  success_criteria:
+    - {metric: api.p99_latency_s, op: "<", value: 0.4}

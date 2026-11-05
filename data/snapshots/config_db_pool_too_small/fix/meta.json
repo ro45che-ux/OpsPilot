@@ -1,0 +1,7 @@
+{
+  "scenario_id": "config_db_pool_too_small",
+  "branch": "fix",
+  "start_ts": 1793828077.288,
+  "end_ts": 1793828147.975,
+  "scrape_interval_s": 2.0
+}

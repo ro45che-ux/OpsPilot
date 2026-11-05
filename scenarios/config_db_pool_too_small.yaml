@@ -1,0 +1,37 @@
+id: config_db_pool_too_small
+title: Requests fail with 503 after a config change
+difficulty: medium
+description: >
+  A config change lowers db_pool_size from 8 to 2. No deploy happens. At 40 rps every request
+  needs a connection for ~100ms, so the pool saturates and requests time out waiting for one.
+alert:
+  name: ApiHighErrorRate
+  severity: page
+  service: api
+  summary: api 5xx rate above 2%
+inject:
+  - op: set_config
+    at: 0
+    id: chg-pool
+    service: api
+    key: db_pool_size
+    value: 2
+    summary: Lower DB pool to 2 to reduce connection pressure on the database
+    author: dev.maya
+ground_truth:
+  root_cause:
+    category: config_change
+    service: api
+    change_id: chg-pool
+    summary: db_pool_size lowered from 8 to 2, pool exhausted under normal load
+  required_evidence:
+    - {source: change, ref: chg-pool}
+    - {source: log, service: api, msg_contains: PoolTimeout}
+    - {source: metric, name: db_pool_timeouts_total}
+  correct_actions:
+    - {type: revert_config, service: api, key: db_pool_size, value: 8}
+  wrong_actions:
+    - {type: rollback_deploy, service: api, to_version: "1.4.0"}
+    - {type: restart_service, service: api}
+  success_criteria:
+    - {metric: api.error_rate, op: "<", value: 0.02}

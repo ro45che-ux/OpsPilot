@@ -1,0 +1,30 @@
+id: bad_deploy_n_plus_one
+title: Order listing slows to a crawl after a deploy
+difficulty: easy
+description: >
+  api 1.5.0 changes GET /orders to load line items one order at a time. Query count per request
+  jumps from 2 to ~31, connection hold time grows and p99 latency climbs.
+alert:
+  name: ApiHighLatencyP99
+  severity: page
+  service: api
+  summary: api p99 request latency above 400ms
+inject:
+  - {op: deploy, at: 0, id: chg-n1, service: api, version: "1.5.0"}
+ground_truth:
+  root_cause:
+    category: bad_deploy
+    service: api
+    change_id: chg-n1
+    summary: api 1.5.0 introduced an N+1 query in list_orders
+  required_evidence:
+    - {source: change, ref: chg-n1}
+    - {source: log, service: api, field: db_queries, min: 20}
+    - {source: metric, name: db_queries_total}
+  correct_actions:
+    - {type: rollback_deploy, service: api, to_version: "1.4.1"}
+  wrong_actions:
+    - {type: restart_service, service: api}
+    - {type: rollback_deploy, service: worker, to_version: "2.2.0"}
+  success_criteria:
+    - {metric: api.p99_latency_s, op: "<", value: 0.4}

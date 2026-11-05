@@ -1,0 +1,7 @@
+{
+  "scenario_id": "bad_deploy_memory_leak",
+  "branch": "nofix",
+  "start_ts": 1793827735.482,
+  "end_ts": 1793827801.142,
+  "scrape_interval_s": 2.0
+}

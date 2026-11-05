@@ -1,0 +1,7 @@
+{
+  "scenario_id": "downstream_payments_latency",
+  "branch": "nofix",
+  "start_ts": 1793828219.246,
+  "end_ts": 1793828285.122,
+  "scrape_interval_s": 2.0
+}

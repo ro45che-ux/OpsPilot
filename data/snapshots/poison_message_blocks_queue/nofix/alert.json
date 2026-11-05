@@ -1,0 +1,7 @@
+{
+  "name": "WorkerQueueBacklog",
+  "severity": "page",
+  "service": "worker",
+  "summary": "worker queue depth above 50 and growing",
+  "fired_at": 1793828463.369
+}

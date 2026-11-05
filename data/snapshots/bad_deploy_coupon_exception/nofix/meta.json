@@ -1,0 +1,7 @@
+{
+  "scenario_id": "bad_deploy_coupon_exception",
+  "branch": "nofix",
+  "start_ts": 1793827598.33,
+  "end_ts": 1793827664.05,
+  "scrape_interval_s": 2.0
+}

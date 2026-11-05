@@ -1,0 +1,36 @@
+# Live demo stack. The scenario recorder uses local processes instead (see opspilot/stack.py),
+# so recording and evals never need Docker. Inject faults with:
+#   docker compose exec api python -m testbed.deployctl deploy api 1.5.0
+#   docker compose exec api python -m testbed.deployctl fault payments_latency_ms 1000
+x-app: &app
+  build: .
+  volumes: ["state:/state"]
+
+services:
+  api:
+    <<: *app
+    command: uvicorn testbed.api.app:app --host 0.0.0.0 --port 8000 --log-level warning --no-access-log
+    ports: ["8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      retries: 10
+
+  worker:
+    <<: *app
+    command: python -m testbed.worker.main
+    environment: {WORKER_METRICS_ADDR: "0.0.0.0", WORKER_METRICS_PORT: "9101"}
+    depends_on: {api: {condition: service_healthy}}
+
+  loadgen:
+    <<: *app
+    command: python -m testbed.loadgen.loadgen --url http://api:8000 --rate 40
+    depends_on: {api: {condition: service_healthy}}
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes: ["./testbed/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["9090:9090"]
+
+volumes:
+  state:

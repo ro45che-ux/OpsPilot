@@ -1,0 +1,30 @@
+id: bad_deploy_coupon_exception
+title: Checkout starts returning 500s for some customers
+difficulty: easy
+description: >
+  api 1.5.1 looks coupon codes up with COUPONS[code]. Expired or unknown codes raise KeyError
+  and the order fails with a 500; valid codes and no-coupon orders keep working.
+alert:
+  name: ApiHighErrorRate
+  severity: page
+  service: api
+  summary: api 5xx rate above 2%
+inject:
+  - {op: deploy, at: 0, id: chg-coupon, service: api, version: "1.5.1"}
+ground_truth:
+  root_cause:
+    category: bad_deploy
+    service: api
+    change_id: chg-coupon
+    summary: api 1.5.1 raises KeyError on unknown coupon codes in apply_coupon
+  required_evidence:
+    - {source: change, ref: chg-coupon}
+    - {source: log, service: api, msg_contains: KeyError}
+    - {source: metric, name: http_requests_total}
+  correct_actions:
+    - {type: rollback_deploy, service: api, to_version: "1.4.1"}
+  wrong_actions:
+    - {type: restart_service, service: api}
+    - {type: restart_service, service: worker}
+  success_criteria:
+    - {metric: api.error_rate, op: "<", value: 0.02}

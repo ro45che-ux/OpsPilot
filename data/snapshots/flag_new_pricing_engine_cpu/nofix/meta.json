@@ -1,0 +1,7 @@
+{
+  "scenario_id": "flag_new_pricing_engine_cpu",
+  "branch": "nofix",
+  "start_ts": 1793828290.498,
+  "end_ts": 1793828356.157,
+  "scrape_interval_s": 2.0
+}

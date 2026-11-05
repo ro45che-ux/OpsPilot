@@ -1,0 +1,30 @@
+id: bad_deploy_memory_leak
+title: API memory climbs steadily after a deploy
+difficulty: medium
+description: >
+  api 1.5.2 memoizes every price quote in an unbounded dict keyed by request id. Heap in use
+  grows with each order. Restarting only resets the clock; rolling back fixes it.
+alert:
+  name: ApiMemoryHigh
+  severity: page
+  service: api
+  summary: api heap in use above 100MB
+inject:
+  - {op: deploy, at: 0, id: chg-leak, service: api, version: "1.5.2"}
+ground_truth:
+  root_cause:
+    category: bad_deploy
+    service: api
+    change_id: chg-leak
+    summary: api 1.5.2 caches quotes per request id in an unbounded dict
+  required_evidence:
+    - {source: change, ref: chg-leak}
+    - {source: metric, name: process_heap_bytes}
+  correct_actions:
+    - {type: rollback_deploy, service: api, to_version: "1.4.1"}
+  acceptable_actions:
+    - {type: restart_service, service: api}
+  wrong_actions:
+    - {type: rollback_deploy, service: worker, to_version: "2.2.0"}
+  success_criteria:
+    - {metric: api.memory_mb, op: "<", value: 100}

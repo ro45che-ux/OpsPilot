@@ -1,0 +1,7 @@
+{
+  "scenario_id": "poison_message_blocks_queue",
+  "branch": "fix",
+  "start_ts": 1793828493.812,
+  "end_ts": 1793828564.465,
+  "scrape_interval_s": 2.0
+}

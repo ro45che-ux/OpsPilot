@@ -1,0 +1,7 @@
+{
+  "scenario_id": "flag_new_pricing_engine_cpu",
+  "branch": "fix",
+  "start_ts": 1793828356.739,
+  "end_ts": 1793828427.401,
+  "scrape_interval_s": 2.0
+}

@@ -1,0 +1,7 @@
+{
+  "scenario_id": "downstream_latency_red_herring_deploy",
+  "branch": "nofix",
+  "start_ts": 1793828148.319,
+  "end_ts": 1793828213.983,
+  "scrape_interval_s": 2.0
+}

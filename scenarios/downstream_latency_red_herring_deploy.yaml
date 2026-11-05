@@ -1,0 +1,31 @@
+id: downstream_latency_red_herring_deploy
+title: Latency alert right after an unrelated deploy
+difficulty: hard
+description: >
+  api 1.5.3 (an email template copy change) ships just before the payments provider degrades.
+  The deploy is the most recent change and is the obvious suspect, but its diff touches nothing
+  on the request path. Rolling it back wastes time and risk; the right call is to escalate.
+alert:
+  name: ApiHighLatencyP99
+  severity: page
+  service: api
+  summary: api p99 request latency above 400ms
+inject:
+  - {op: deploy, at: -8, id: chg-rh, service: api, version: "1.5.3"}
+  - {op: fault, at: 0, key: payments_latency_ms, value: 1000}
+ground_truth:
+  root_cause:
+    category: downstream_dependency
+    service: payments
+    summary: payments provider latency rose by ~1s; the api 1.5.3 deploy is unrelated
+  required_evidence:
+    - {source: log, service: api, msg_contains: payments provider slow}
+    - {source: metric, name: payments_request_duration_seconds_bucket}
+  red_herring_changes: [chg-rh]
+  correct_actions:
+    - {type: escalate, reason: third-party payments provider degraded}
+  wrong_actions:
+    - {type: rollback_deploy, service: api, to_version: "1.4.1"}
+    - {type: restart_service, service: api}
+  success_criteria:
+    - {metric: api.p99_latency_s, op: "<", value: 0.4}
