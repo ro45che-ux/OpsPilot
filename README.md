@@ -141,11 +141,151 @@ The model proposes; it never decides.
 - **No time travel, no leaks**: replay tools only expose data up to the investigation moment, and ground truth and
   `harness.json` never appear in tool output (tested for every scenario).
 
+## Run it in VS Code, step by step
+
+The flow below was run from a fresh `git clone` to confirm it works as written. It covers **macOS and Linux** (and **Windows via WSL**). On native Windows, replay mode and the console work, but recording and live mode need macOS, Linux or WSL because they use POSIX process groups.
+
+```text
+clone -> install -> verify -> run one incident -> open the console -> approve in the browser -> benchmark
+                                                        optional: real LLM  |  live testbed  |  Docker
+```
+
+**You need:** Python 3.11 or newer, Git, and [VS Code](https://code.visualstudio.com/) with the **Python** extension. Docker Desktop is optional (only for step 9).
+
+### 1. Get the code and open it
+
+```bash
+git clone https://github.com/ro45che-ux/OpsPilot.git
+cd OpsPilot
+code .
+```
+
+### 2. Create the environment (VS Code terminal: <kbd>Ctrl</kbd>+<kbd>`</kbd>)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate            # Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -e '.[dev]'
+```
+
+Then tell VS Code which Python to use: <kbd>Cmd/Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> -> **Python: Select Interpreter** -> choose the one inside `.venv`.
+Check: the terminal prompt starts with `(.venv)` and `opspilot --help` prints the command list.
+
+### 3. Verify the install
+
+```bash
+opspilot list                        # the 8 scenarios
+opspilot check                       # prints: scenario definitions OK
+opspilot validate all                # prints: ok <scenario>, once per scenario
+pytest -m "not slow"                 # 92 passed (about 30 seconds, no network, no API key)
+```
+
+The recorded benchmark is already in `data/snapshots/`, so nothing needs recording first.
+
+### 4. Run one incident in the terminal
+
+```bash
+opspilot investigate bad_deploy_n_plus_one --agent heuristic --approve auto
+```
+
+You should see `RESOLVED - recovery criteria met` and a verification line where `api.p99_latency_s` falls from about `0.69` to `0.245`, followed by a markdown incident report.
+To be the human in the loop yourself, use `--approve ask` and answer `y` or `n` at the prompt.
+
+### 5. Watch a wrong fix fail
+
+```bash
+opspilot investigate downstream_latency_red_herring_deploy --agent heuristic --approve auto
+```
+
+The runbook baseline blames the innocent deploy, a wrong rollback runs, and you should see `ESCALATED - no approved action recovered the system` with `not_recovered`. This is the scenario that shows why a recent change is a lead, not proof.
+
+### 6. Open the console
+
+Open a **second terminal** (the `+` or split icon in the terminal panel) so the first stays free, then run:
+
+```bash
+opspilot serve
+```
+
+The terminal stays silent while it runs. Open **http://127.0.0.1:8080** in your browser (or <kbd>Cmd/Ctrl</kbd>-click the address). Incidents are stored in `data/opspilot.db`.
+
+### 7. A human-approved incident in the browser
+
+1. Click **New incident**, pick a scenario, keep **Replay**, choose **I approve**, keep **Demo speed**, and press **Start investigation**.
+2. Watch the agent's tool calls stream into the **Agent trace**.
+3. Read the **Human approval required** card (the action, plan, risk, cited evidence and recovery criteria), then click **Approve & execute**.
+4. Read the **Recovery verification**, the **scorecard** against the hidden ground truth, and the charts. Click an evidence chip to jump to the tool call behind it.
+5. Open **Benchmark** to see the agent comparison, or **Postmortem report** on the incident for the audit-log report.
+
+### 8. Run the benchmark
+
+```bash
+opspilot eval --agents null,heuristic,oracle,oracle-wrong
+```
+
+This takes seconds and needs no API key. Expected: the oracle scores 100%, the wrong oracle 0%, and **0 unapproved executions** for every agent. (It rewrites `results/latest.md`; use `git checkout results/latest.md` to restore the committed one.)
+
+**Optional: real LLM agents.** Create a file named `.env` in the project root (it is git-ignored, never commit it) with:
+
+```text
+GEMINI_API_KEY=your-key-here
+OPSPILOT_MODEL=gemini-3.1-flash-lite
+```
+
+Restart `opspilot serve` and the LLM agents become selectable. From the terminal:
+
+```bash
+opspilot eval --agents llm --scenarios bad_deploy_n_plus_one
+```
+
+A free Gemini key is available from [aistudio.google.com/apikey](https://aistudio.google.com/apikey). The free tier is rate limited (see the Results section).
+
+### 9. Optional: real processes and Docker
+
+```bash
+opspilot investigate bad_deploy_n_plus_one --live --agent heuristic --approve auto   # about 70 s, macOS/Linux/WSL
+docker compose up -d --build                                                         # API, worker, load, Prometheus
+docker compose down -v                                                               # stop and clean up
+```
+
+### 10. Stop and clean up
+
+Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal running `serve`, then run `deactivate` to leave the virtual environment.
+
+### VS Code tips
+
+* **Run tests from the UI:** <kbd>Cmd/Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> -> **Python: Configure Tests** -> `pytest` -> `tests`. Then use the **Testing** panel to run or debug a single test.
+* **Debug the console:** add `.vscode/launch.json` with the configuration below, set a breakpoint in `opspilot/web.py`, and press <kbd>F5</kbd>.
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "name": "OpsPilot console", "type": "debugpy", "request": "launch",
+      "module": "opspilot.cli", "args": ["serve"] }
+  ]
+}
+```
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `opspilot: command not found` | The virtual environment is not active (look for `(.venv)` in the prompt), or `pip install -e '.[dev]'` has not run. You can also call `.venv/bin/opspilot` directly. |
+| `zsh: no matches found: .[dev]` | Keep the quotes: `pip install -e '.[dev]'`. |
+| Port 8080 is already in use | `opspilot serve --port 8081` and open that port instead. |
+| LLM agents are greyed out in the console | No API key is set. Add it to `.env` and restart `opspilot serve`. |
+| Gemini returns a daily-quota error | The free tier is limited per model; set `OPSPILOT_MODEL=gemini-3.1-flash-lite`. |
+| Python version error on install | Use Python 3.11 or newer (`python3 --version`). |
+| `docker: command not found` | Install Docker Desktop and start it before running `docker compose`. |
+
+> **Note:** the console has **no authentication**, so run it only on your own machine and do not expose it to a network.
+
 ## Quickstart
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
-.venv/bin/pytest -m "not slow"                          # 81 tests, ~30s, no network, no LLM
+.venv/bin/pytest -m "not slow"                          # 92 tests, ~30s, no network, no LLM
 .venv/bin/opspilot list
 .venv/bin/opspilot eval                                 # null, heuristic, oracle on all scenarios
 
